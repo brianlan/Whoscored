@@ -141,9 +141,10 @@ def scrape_single_match(league_name, season, url, match_id, db_cur, conn):
 
     # return html
 
-seed_url = 'http://www.whoscored.com/Regions/252/Tournaments/2/Seasons/3853'
-start_week_num = 69
-num_weeks = 10
+seed_url = 'http://www.whoscored.com/Regions/252/Tournaments/2/Seasons/3389'
+# start_week_num = 49 # 1-7 Dec 2014
+start_week_num = 33
+num_weeks = 1
 
 html = web.URL(seed_url).download(cached=False)
 
