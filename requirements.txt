@@ -1,0 +1,2 @@
+pattern==2.6
+pandas==0.16.1

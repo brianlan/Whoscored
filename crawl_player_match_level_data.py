@@ -9,6 +9,7 @@ import os
 import sqlite3
 from sets import Set
 
+
 def get_team_var_set(url, var_set):
     tmp_html = web.URL(url).download(cached=False)
     regM = re.search('href="(/Matches.{1,128}?)".{1,10}Match Centre', tmp_html, re.DOTALL)
@@ -123,62 +124,58 @@ def scrape_single_match(league_name, season, url, match_id, db_cur, conn):
             db_cur.execute(sql_stat)
 
     conn.commit()
-    # test
-    # tmp_url = 'http://www.whoscored.com/Matches/738819/LiveStatistics/Spain-La-Liga-2013-2014-Barcelona-Atletico-Madrid'
 
-    # html = web.URL(tmp_url).download(cached=False)
-    # regM = re.search('var initialData = (.*?);', html, re.DOTALL)
-    # data = regM.group(1)
 
-    # while ',,' in data:
-    #     data = data.replace(',,', ",' ',")
+def scrape_1_year_data_of_1_league(seed_url, start_week_num, num_weeks):
+    # seed_url = 'http://www.whoscored.com/Regions/252/Tournaments/2/Seasons/1849'
+    # start_week_num = 30
+    # num_weeks = 48
 
-    # data = ast.literal_eval(data)
+    html = web.URL('https://www.whoscored.com/Accounts/').download(cached=False, user_agent='Mozilla/5.0')
 
-    # for p in data[0][1][0][4]:
-    #     print p[0:3], p[4:]
-    # end of test
+    regM = re.search('<h2 class="tournament-tables-header">(.*?)</h2>', html, re.DOTALL)
+    if regM is not None:
+        league_name = regM.group(1).replace('Tables','').strip()
 
-    # return html
+    if league_name == 'Primera Division':
+        league_name = 'LIGA BBVA'
 
-seed_url = 'http://www.whoscored.com/Regions/252/Tournaments/2/Seasons/3389'
-# start_week_num = 49 # 1-7 Dec 2014
-start_week_num = 33
-num_weeks = 1
+    regM = re.search('<div id="sub-navigation".*?>.*?<a href="(.*?)"', html, re.DOTALL)
+    regM = re.search('Stages/(\d+)/', regM.group(1), re.DOTALL)
+    league_season_id = regM.group(1)
 
-html = web.URL(seed_url).download(cached=False)
+    regM = re.search("min = new Date\((\d+),", html, re.DOTALL)
+    start_year = int(regM.group(1))
 
-regM = re.search("<h1>(.*?)</h1>", html, re.DOTALL)
-league_name = regM.group(1)
+    # outfile = open('premier-league-2013-2014.txt', 'wb')
+    # var_set = Set()
+    conn = sqlite3.connect('whoscored.db')
+    db_cur = conn.cursor()
+    for i in range(start_week_num, start_week_num + num_weeks):
+        y = start_year + i / 52
+        w = i % 52
+        ajax_request_url = 'http://www.whoscored.com/tournamentsfeed/'+league_season_id+'/Fixtures/?d='+str(y)+'W'+str(w)+'&isAggregate=false'
+        ajax_return_str = web.URL(ajax_request_url).download(cached=False)
+        matches_of_week = ast.literal_eval(ajax_return_str)
 
-regM = re.search("img/customstageheaders/(\d+)\.jpg", html, re.DOTALL)
-league_season_id = regM.group(1)
+        if matches_of_week != '[]':
+            for m in matches_of_week:
+                match_id = m[0]
+                match_url = 'http://www.whoscored.com/Matches/' + str(match_id) + '/MatchReport'
+                print str(y) + '-W' + str(w) + ': ', match_url
+                scrape_single_match(league_name, str(start_year)+'-'+str(start_year+1), match_url, match_id, db_cur, conn)
 
-regM = re.search("min = new Date\((\d+),", html, re.DOTALL)
-start_year = int(regM.group(1))
+                # outfile.write(url+os.linesep)
+                # get_player_var_set(url, var_set)
 
-# outfile = open('premier-league-2013-2014.txt', 'wb')
-# var_set = Set()
-conn = sqlite3.connect('whoscored.db')
-db_cur = conn.cursor()
-for i in range(start_week_num, start_week_num + num_weeks):
-    y = start_year + i / 52
-    w = i % 52
-    ajax_request_url = 'http://www.whoscored.com/tournamentsfeed/'+league_season_id+'/Fixtures/?d='+str(y)+'W'+str(w)+'&isAggregate=false'
-    ajax_return_str = web.URL(ajax_request_url).download(cached=False)
-    matches_of_week = ast.literal_eval(ajax_return_str)
+    conn.close()
+    # print var_set
+    # outfile.close
 
-    if matches_of_week != '[]':
-        for m in matches_of_week:
-            match_id = m[0]
-            match_url = 'http://www.whoscored.com/Matches/' + str(match_id) + '/MatchReport'
-            print str(y) + '-W' + str(w) + ': ', match_url
-            scrape_single_match(league_name, str(start_year)+'-'+str(start_year+1), match_url, match_id, db_cur, conn)
+if __name__ == '__main__':
+    league_seed_list = ['https://www.whoscored.com/Regions/206/Tournaments/4/Seasons/1929']
 
-            # outfile.write(url+os.linesep)
-            # get_player_var_set(url, var_set)
-
-conn.close()
-# print var_set
-# outfile.close
-
+    for seed_url in league_seed_list:
+        print '================================================================' + os.linesep + seed_url + os.linesep + '================================================================' + os.linesep
+        scrape_1_year_data_of_1_league(seed_url, 30, 48)
+        # start_week_num = 49 # 1-7 Dec 2014
